@@ -13,7 +13,7 @@ class PostureGauge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 168,
+      height: 188,
       width: double.infinity,
       child: CustomPaint(
         painter: _GaugePainter(angle: angle, threshold: threshold.toDouble()),
@@ -31,61 +31,84 @@ class _GaugePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     const maxAngle = 40.0;
+    const stroke = 14.0;
     final cx = size.width / 2;
-    final cy = size.height - 18;
-    final radius = min(size.width * 0.42, cy - 8);
-    final rect = Rect.fromCircle(center: Offset(cx, cy), radius: radius);
+    final radius = min((size.width - 64) / 2, size.height - 46);
+    final cy = 10 + stroke / 2 + radius;
+
+    // t = 0 is the left end (0°), t = 1 is the right end (40°), along the top.
+    Offset at(double t, double r) {
+      final a = pi * (1 - t);
+      return Offset(cx + cos(a) * r, cy - sin(a) * r);
+    }
+
+    Path band(double from, double to) {
+      final path = Path()..moveTo(at(from, radius).dx, at(from, radius).dy);
+      final steps = max(12, ((to - from) * 64).round());
+      for (var i = 1; i <= steps; i++) {
+        final p = at(from + (to - from) * i / steps, radius);
+        path.lineTo(p.dx, p.dy);
+      }
+      return path;
+    }
+
     final track = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 16
-      ..strokeCap = StrokeCap.round
-      ..color = AppColors.cream;
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.butt
+      ..strokeJoin = StrokeJoin.round
+      ..color = const Color(0xFFF8E7C8);
     final fill = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 16
-      ..strokeCap = StrokeCap.round
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.butt
+      ..strokeJoin = StrokeJoin.round
       ..color = AppColors.orange;
+    final trackDot = Paint()..color = const Color(0xFFF8E7C8);
+    final fillDot = Paint()..color = AppColors.orange;
 
-    canvas.drawArc(rect, pi, -pi, false, track);
-    final shown = angle.clamp(0, maxAngle);
-    if (shown > 0.4) {
-      canvas.drawArc(rect, pi, -pi * (shown / maxAngle), false, fill);
+    canvas.drawPath(band(0, 1), track);
+    canvas.drawCircle(at(0, radius), stroke / 2, trackDot);
+    canvas.drawCircle(at(1, radius), stroke / 2, trackDot);
+
+    final shown = angle.clamp(0, maxAngle) / maxAngle;
+    if (shown > 0.012) {
+      canvas.drawPath(band(0, shown), fill);
+      canvas.drawCircle(at(0, radius), stroke / 2, fillDot);
+      canvas.drawCircle(at(shown, radius), stroke / 2, fillDot);
     }
 
-    final mark = pi * (1 - (threshold / maxAngle).clamp(0, 1));
-    final dot = Paint()..color = const Color(0xFFB9B4AE);
-    for (var i = 0; i < 7; i++) {
-      final r = radius * (0.62 + 0.38 * i / 6);
-      canvas.drawCircle(Offset(cx + cos(mark) * r, cy - sin(mark) * r), 1.5, dot);
+    final mark = (threshold / maxAngle).clamp(0.0, 1.0);
+    final dash = Paint()..color = const Color(0xFF6F6A64);
+    for (var i = 0; i < 5; i++) {
+      final r = radius * (0.52 + 0.28 * i / 4);
+      canvas.drawCircle(at(mark, r), 1.7, dash);
     }
 
-    final needle = pi * (1 - shown / maxAngle);
-    final tip = Offset(cx + cos(needle) * (radius - 28), cy - sin(needle) * (radius - 28));
+    final tip = at(shown, radius - stroke / 2 - 12);
     canvas.drawLine(
       Offset(cx, cy),
       tip,
       Paint()
         ..color = AppColors.ink
-        ..strokeWidth = 3
+        ..strokeWidth = 2.4
         ..strokeCap = StrokeCap.round,
     );
-    canvas.drawCircle(Offset(cx, cy), 7, Paint()..color = AppColors.ink);
-    canvas.drawCircle(Offset(cx, cy), 3, Paint()..color = Colors.white);
+    canvas.drawCircle(Offset(cx, cy), 5.5, Paint()..color = AppColors.ink);
 
-    _label(canvas, '0°', Offset(cx - radius - 4, cy + 8), TextAlign.left);
-    _label(canvas, '40°', Offset(cx + radius - 18, cy + 8), TextAlign.right);
+    _label(canvas, '0°', at(0, radius) + const Offset(0, 12));
+    _label(canvas, '40°', at(1, radius) + const Offset(0, 12));
   }
 
-  void _label(Canvas canvas, String text, Offset offset, TextAlign align) {
+  void _label(Canvas canvas, String text, Offset anchor) {
     final painter = TextPainter(
       text: TextSpan(
         text: text,
-        style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w600),
+        style: const TextStyle(color: AppColors.muted, fontSize: 13, fontWeight: FontWeight.w600),
       ),
       textDirection: TextDirection.ltr,
-      textAlign: align,
     )..layout();
-    painter.paint(canvas, offset);
+    painter.paint(canvas, Offset(anchor.dx - painter.width / 2, anchor.dy));
   }
 
   @override

@@ -108,6 +108,9 @@ class BlePostureClient implements PostureClient {
   }
 
   Future<void> _prepare(BluetoothDevice device) async {
+    try {
+      await device.clearGattCache();
+    } catch (_) {}
     final services = await device.discoverServices();
     final posture = _service(services, postureServiceUuid);
     if (posture == null) {
@@ -220,8 +223,14 @@ class BlePostureClient implements PostureClient {
 
   Future<void> _writeCommand(List<int> bytes) async {
     final char = _commandChar;
-    if (char == null) return;
-    await char.write(bytes, withoutResponse: false);
+    if (char == null) {
+      throw StateError('Necklace is not ready for commands');
+    }
+    try {
+      await char.write(bytes, withoutResponse: false);
+    } catch (_) {
+      await char.write(bytes, withoutResponse: true);
+    }
   }
 
   @override
@@ -274,6 +283,12 @@ Future<List<NearbyPostureDevice>> scanForPostureDevices({
       final name = result.advertisementData.advName.isNotEmpty
           ? result.advertisementData.advName
           : result.device.platformName;
+      final looksLikeNecklace = name.toLowerCase().contains('mmh') ||
+          name.toLowerCase().contains('posture') ||
+          result.advertisementData.serviceUuids
+              .map((id) => id.toString().toLowerCase())
+              .contains(postureServiceUuid);
+      if (!looksLikeNecklace && name.isNotEmpty) continue;
       found[result.device.remoteId.str] = NearbyPostureDevice(
         id: result.device.remoteId.str,
         name: name.isEmpty ? 'MMH Posture' : name,
@@ -281,12 +296,25 @@ Future<List<NearbyPostureDevice>> scanForPostureDevices({
       );
     }
   });
-  await FlutterBluePlus.startScan(
-    withServices: [Guid(postureServiceUuid)],
-    timeout: timeout,
-    androidUsesFineLocation: false,
-  );
-  await FlutterBluePlus.isScanning.where((scanning) => !scanning).first;
+  try {
+    // Name and service filters are OR'd. Some phones only match one of them.
+    await FlutterBluePlus.startScan(
+      withServices: [Guid(postureServiceUuid)],
+      withNames: const ['MMH Posture'],
+      timeout: timeout,
+      androidUsesFineLocation: false,
+      androidCheckLocationServices: false,
+    );
+    await FlutterBluePlus.isScanning.where((scanning) => !scanning).first;
+  } catch (_) {
+    await FlutterBluePlus.startScan(
+      withServices: [Guid(postureServiceUuid)],
+      timeout: timeout,
+      androidUsesFineLocation: false,
+      androidCheckLocationServices: false,
+    );
+    await FlutterBluePlus.isScanning.where((scanning) => !scanning).first;
+  }
   await sub.cancel();
   final devices = found.values.toList()
     ..sort((a, b) => b.rssi.compareTo(a.rssi));

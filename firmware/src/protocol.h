@@ -5,13 +5,13 @@
 // Shared with lib/ble/protocol.dart. All multi-byte fields are little-endian.
 //
 // Service  8f3a0001-7c2b-4d6e-9a10-b1c2d3e4f5a6
-// Live     8f3a0002-7c2b-4d6e-9a10-b1c2d3e4f5a6  notify, 4 bytes
+// Live     8f3a0012-7c2b-4d6e-9a10-b1c2d3e4f5a6  read/notify, 10 bytes
 // Config   8f3a0003-7c2b-4d6e-9a10-b1c2d3e4f5a6  read/write, 8 bytes
 // Command  8f3a0004-7c2b-4d6e-9a10-b1c2d3e4f5a6  write, 1-8 bytes
 // History  8f3a0005-7c2b-4d6e-9a10-b1c2d3e4f5a6  notify, 14 bytes
 
 #define POSTURE_SERVICE_UUID "8f3a0001-7c2b-4d6e-9a10-b1c2d3e4f5a6"
-#define POSTURE_LIVE_UUID "8f3a0002-7c2b-4d6e-9a10-b1c2d3e4f5a6"
+#define POSTURE_LIVE_UUID "8f3a0012-7c2b-4d6e-9a10-b1c2d3e4f5a6"
 #define POSTURE_CONFIG_UUID "8f3a0003-7c2b-4d6e-9a10-b1c2d3e4f5a6"
 #define POSTURE_COMMAND_UUID "8f3a0004-7c2b-4d6e-9a10-b1c2d3e4f5a6"
 #define POSTURE_HISTORY_UUID "8f3a0005-7c2b-4d6e-9a10-b1c2d3e4f5a6"
@@ -56,8 +56,11 @@ struct __attribute__((packed)) LivePacket {
   int16_t angleTenthDeg;
   uint8_t flags;
   uint8_t battery;
+  int16_t xMg;
+  int16_t yMg;
+  int16_t zMg;
 };
-static_assert(sizeof(LivePacket) == 4, "LivePacket size");
+static_assert(sizeof(LivePacket) == 10, "LivePacket size");
 
 struct __attribute__((packed)) ConfigPacket {
   uint8_t mode;

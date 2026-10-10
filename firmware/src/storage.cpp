@@ -84,11 +84,11 @@ void saveHistory() {
 
 void storageBegin() {
   flashOk = InternalFS.begin();
-  if (!flashOk) {
-    Serial.println("InternalFS unavailable; history stays in RAM");
-    return;
+  if (flashOk) {
+    loadHistory();
+  } else {
+    Serial.println("Flash filesystem unavailable, history kept in RAM only");
   }
-  loadHistory();
 }
 
 bool storageLoadConfig(PersistConfig* out) {

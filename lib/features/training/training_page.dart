@@ -39,7 +39,16 @@ class TrainingPage extends ConsumerWidget {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: () => ref.read(postureControllerProvider.notifier).testVibration(),
+                  onPressed: () async {
+                    try {
+                      await ref.read(postureControllerProvider.notifier).testVibration();
+                    } catch (error) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Could not reach the necklace ($error)')),
+                      );
+                    }
+                  },
                   icon: const Icon(Icons.vibration),
                   label: const Text('Test vibration'),
                   style: FilledButton.styleFrom(

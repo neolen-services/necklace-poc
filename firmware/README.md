@@ -45,13 +45,18 @@ Also exposes the standard Battery Service and Device Information (firmware `2.4.
 
 All multi-byte integers are little-endian.
 
-### Live `8f3a0002-7c2b-4d6e-9a10-b1c2d3e4f5a6` (notify, 4 bytes, 5 Hz)
+### Live `8f3a0012-7c2b-4d6e-9a10-b1c2d3e4f5a6` (read/notify, 10 bytes, 5 Hz)
 
 | Offset | Type | Meaning |
 | --- | --- | --- |
 | 0 | int16 | Angle in tenths of a degree from upright. 0 until calibrated. |
 | 2 | uint8 | Flags |
 | 3 | uint8 | Battery percent, or 0 if unknown |
+| 4 | int16 | Raw accel X in milli-g |
+| 6 | int16 | Raw accel Y in milli-g |
+| 8 | int16 | Raw accel Z in milli-g |
+
+The IMU power pin (P1.08) must be driven in high-drive mode; with standard drive the sensor never powers up and the I2C bus stays low.
 
 Flags: bit0 upright, bit1 slouching, bit2 calibrating, bit3 worn, bit4 buzzing, bit5 calibrated, bit6 pending (over the angle, still inside the delay), bit7 sensor fault.
 

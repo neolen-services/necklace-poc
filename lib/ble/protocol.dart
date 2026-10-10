@@ -3,7 +3,7 @@ import 'dart:typed_data';
 /// Byte layout shared with firmware/src/protocol.h. Little-endian.
 
 const postureServiceUuid = '8f3a0001-7c2b-4d6e-9a10-b1c2d3e4f5a6';
-const postureLiveUuid = '8f3a0002-7c2b-4d6e-9a10-b1c2d3e4f5a6';
+const postureLiveUuid = '8f3a0012-7c2b-4d6e-9a10-b1c2d3e4f5a6';
 const postureConfigUuid = '8f3a0003-7c2b-4d6e-9a10-b1c2d3e4f5a6';
 const postureCommandUuid = '8f3a0004-7c2b-4d6e-9a10-b1c2d3e4f5a6';
 const postureHistoryUuid = '8f3a0005-7c2b-4d6e-9a10-b1c2d3e4f5a6';
@@ -111,6 +111,9 @@ class LiveReading {
     required this.pending,
     required this.sensorFault,
     required this.battery,
+    this.xMg = 0,
+    this.yMg = 0,
+    this.zMg = 0,
   });
 
   final double angleDeg;
@@ -123,6 +126,9 @@ class LiveReading {
   final bool pending;
   final bool sensorFault;
   final int battery;
+  final int xMg;
+  final int yMg;
+  final int zMg;
 
   static const empty = LiveReading(
     angleDeg: 0,
@@ -149,7 +155,10 @@ class LiveReading {
         other.calibrated == calibrated &&
         other.pending == pending &&
         other.sensorFault == sensorFault &&
-        other.battery == battery;
+        other.battery == battery &&
+        other.xMg == xMg &&
+        other.yMg == yMg &&
+        other.zMg == zMg;
   }
 
   @override
@@ -164,6 +173,9 @@ class LiveReading {
     pending,
     sensorFault,
     battery,
+    xMg,
+    yMg,
+    zMg,
   );
 }
 
@@ -250,6 +262,9 @@ class Protocol {
       pending: (flags & flagPending) != 0,
       sensorFault: (flags & flagSensorFault) != 0,
       battery: data.getUint8(3),
+      xMg: bytes.length >= 10 ? data.getInt16(4, Endian.little) : 0,
+      yMg: bytes.length >= 10 ? data.getInt16(6, Endian.little) : 0,
+      zMg: bytes.length >= 10 ? data.getInt16(8, Endian.little) : 0,
     );
   }
 

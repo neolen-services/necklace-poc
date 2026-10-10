@@ -150,7 +150,8 @@ class LiveCard extends ConsumerWidget {
             angle: connected ? live.angleDeg : 0,
             threshold: config.thresholdDeg,
           ),
-          Text(title, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          Text(title, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, height: 1.1)),
           const SizedBox(height: 4),
           Text(
             connected
@@ -210,7 +211,7 @@ class CalibrationRow extends ConsumerWidget {
           ),
           TextButton.icon(
             onPressed: () => ref.read(postureControllerProvider.notifier).calibrate(),
-            icon: const Icon(Icons.refresh, size: 18),
+            icon: const Icon(Icons.my_location, size: 18),
             label: const Text('Recalibrate'),
             style: TextButton.styleFrom(foregroundColor: AppColors.orangeDeep),
           ),

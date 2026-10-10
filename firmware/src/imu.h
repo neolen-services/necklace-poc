@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 struct AccelSample {
   float x;
   float y;
@@ -10,3 +12,5 @@ struct AccelSample {
 void imuBegin();
 bool imuOk();
 AccelSample imuRead();
+uint8_t imuError();
+void imuServiceWatchdog();

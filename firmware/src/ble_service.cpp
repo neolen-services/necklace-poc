@@ -16,7 +16,6 @@ BLEDis deviceInfo;
 BLEBas battery;
 
 bool connected = false;
-uint8_t batteryPercent = 0;
 
 void onConnect(uint16_t connHandle) {
   (void)connHandle;
@@ -81,13 +80,13 @@ void bleBegin() {
   configChr.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
   configChr.setPermission(SECMODE_OPEN, SECMODE_OPEN);
   configChr.setFixedLen(sizeof(ConfigPacket));
-  configChr.setWriteCallback(onConfigWrite);
+  configChr.setWriteCallback(onConfigWrite, false);
   configChr.begin();
 
-  commandChr.setProperties(CHR_PROPS_WRITE);
+  commandChr.setProperties(CHR_PROPS_WRITE | CHR_PROPS_WRITE_WO_RESP);
   commandChr.setPermission(SECMODE_NO_ACCESS, SECMODE_OPEN);
   commandChr.setMaxLen(16);
-  commandChr.setWriteCallback(onCommandWrite);
+  commandChr.setWriteCallback(onCommandWrite, false);
   commandChr.begin();
 
   historyChr.setProperties(CHR_PROPS_NOTIFY);
@@ -96,17 +95,22 @@ void bleBegin() {
   historyChr.begin();
 
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
-  Bluefruit.Advertising.addTxPower();
-  Bluefruit.Advertising.addService(postureService);
-  Bluefruit.ScanResponse.addName();
+  // The full name has to be in the advertising packet. A service-only
+  // advert is ignored by some Android phones, including ColorOS.
+  Bluefruit.Advertising.addName();
+  Bluefruit.ScanResponse.addService(postureService);
   Bluefruit.Advertising.restartOnDisconnect(true);
-  Bluefruit.Advertising.setInterval(32, 244);
-  Bluefruit.Advertising.setFastTimeout(30);
+  Bluefruit.Advertising.setInterval(32, 160);
+  Bluefruit.Advertising.setFastTimeout(0);
   Bluefruit.Advertising.start(0);
   Serial.println("Advertising as " DEVICE_NAME);
 }
 
-void blePump() {}
+void blePump() {
+  if (!connected && !Bluefruit.Advertising.isRunning()) {
+    Bluefruit.Advertising.start(0);
+  }
+}
 
 bool bleConnected() { return connected; }
 
@@ -125,7 +129,6 @@ bool bleNotifyHistory(const HistoryPacket& packet) {
 }
 
 void bleWriteBattery(uint8_t percent) {
-  batteryPercent = percent;
   if (connected) {
     battery.write(percent);
   }

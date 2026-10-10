@@ -45,7 +45,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = 'Scan failed. Turn Bluetooth on and try again.');
+      setState(() => _error = 'Scan failed ($error). Turn Bluetooth on and try again.');
     } finally {
       if (mounted) setState(() => _scanning = false);
     }

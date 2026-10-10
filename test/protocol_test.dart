@@ -31,6 +31,18 @@ void main() {
     expect(live.calibrated, isTrue);
     expect(live.upright, isFalse);
     expect(live.battery, 86);
+    expect(live.xMg, 0);
+  });
+
+  test('live packet raw acceleration', () {
+    final data = ByteData(10);
+    data.setInt16(4, 401, Endian.little);
+    data.setInt16(6, -480, Endian.little);
+    data.setInt16(8, 780, Endian.little);
+    final live = Protocol.decodeLive(data.buffer.asUint8List());
+    expect(live.xMg, 401);
+    expect(live.yMg, -480);
+    expect(live.zMg, 780);
   });
 
   test('history minute, slouch, and end packets', () {

@@ -23,6 +23,7 @@ ConfigPacket cfg{
 };
 
 float gx = 0, gy = 0, gz = 1;
+float rawAx = 0, rawAy = 0, rawAz = 0;
 bool filterInit = false;
 float refX = 0, refY = 0, refZ = 1;
 bool hasRef = false;
@@ -62,8 +63,7 @@ int calCount = 0;
 float calX = 0, calY = 0, calZ = 0;
 uint32_t calibratingUntil = 0;
 
-uint32_t testStartMs = 0;
-uint32_t testDurMs = 0;
+volatile uint32_t vibeUntilMs = 0;
 
 bool syncing = false;
 uint16_t syncIndex = 0;
@@ -165,32 +165,11 @@ void finishCalibration() {
   Serial.println("Calibrated");
 }
 
-void setBuzz(bool on, uint8_t strength) {
-#if defined(LED_RED)
-  const int led = LED_RED;
-#elif defined(LED_BUILTIN)
-  const int led = LED_BUILTIN;
-#else
-  const int led = -1;
-#endif
-  if (on && strength > 0) {
-    analogWrite(VIBE_PIN, (int)strength * 255 / 100);
-    if (led >= 0) digitalWrite(led, LOW);
-  } else {
-    analogWrite(VIBE_PIN, 0);
-    if (led >= 0) digitalWrite(led, HIGH);
-  }
-}
+void armVibration(uint32_t durationMs) { vibeUntilMs = millis() + durationMs; }
 
 bool buzzingNow(uint32_t nowMs) {
-  if (testDurMs > 0 && (nowMs - testStartMs) < testDurMs) {
-    return true;
-  }
-  if (cfg.mode != MODE_TRAINING || slouch != ST_SLOUCH || cfg.strength == 0) {
-    return false;
-  }
-  uint32_t phase = (nowMs / 100UL) % 8UL;  // 200 ms on, 600 ms off
-  return phase < 2;
+  bool testBuzz = (int32_t)(vibeUntilMs - nowMs) > 0;
+  return testBuzz || (cfg.mode == MODE_TRAINING && slouch == ST_SLOUCH && cfg.strength > 0);
 }
 
 int readBattery() {
@@ -348,7 +327,6 @@ void publishLive(uint32_t nowMs, float angle) {
   int tenth = (int)(angle * 10.0f + 0.5f);
   if (tenth < 0) tenth = 0;
   if (tenth > 1800) tenth = 1800;
-  if (!hasRef) tenth = 0;
   live.angleTenthDeg = (int16_t)tenth;
   if (hasRef && worn && slouch == ST_OK && angle <= cfg.thresholdDeg) {
     live.flags |= FLAG_UPRIGHT;
@@ -362,23 +340,15 @@ void publishLive(uint32_t nowMs, float angle) {
   if (slouch == ST_PENDING) live.flags |= FLAG_PENDING;
   if (sensorFault) live.flags |= FLAG_SENSOR_FAULT;
   live.battery = battery;
+  live.xMg = (int16_t)(rawAx * 1000.0f);
+  live.yMg = (int16_t)(rawAy * 1000.0f);
+  live.zMg = (int16_t)(rawAz * 1000.0f);
   bleNotifyLive(live);
 }
 
 }  // namespace
 
 void postureBegin() {
-  pinMode(VIBE_PIN, OUTPUT);
-  digitalWrite(VIBE_PIN, LOW);
-#if defined(LED_RED)
-  pinMode(LED_RED, OUTPUT);
-  digitalWrite(LED_RED, HIGH);
-#endif
-#if defined(LED_GREEN)
-  pinMode(LED_GREEN, OUTPUT);
-  digitalWrite(LED_GREEN, HIGH);
-#endif
-
   storageBegin();
   PersistConfig stored{};
   if (storageLoadConfig(&stored)) {
@@ -406,9 +376,26 @@ void postureSetConnected(bool isConnected) {
     syncing = false;
     flushRequested = true;
   }
-#if defined(LED_GREEN)
-  digitalWrite(LED_GREEN, isConnected ? LOW : HIGH);
-#endif
+}
+
+// Runs every 50 ms from a timer and is the only owner of the LEDs and motor.
+void postureLedTick() {
+  imuServiceWatchdog();
+  uint32_t now = millis();
+  if (buzzingNow(now)) {
+    bool pulse = ((now / 140UL) % 2UL) == 0UL;
+    digitalWrite(LED_RED, pulse ? LOW : HIGH);
+    digitalWrite(LED_GREEN, HIGH);
+    digitalWrite(LED_BLUE, HIGH);
+    analogWrite(VIBE_PIN, pulse ? (int)cfg.strength * 255 / 100 : 0);
+    return;
+  }
+  analogWrite(VIBE_PIN, 0);
+  digitalWrite(LED_RED, HIGH);
+  // Green stays on while the phone is connected. Blue blinks only while waiting.
+  bool waitingBlink = !connected && (now % 1000UL) < 160UL;
+  digitalWrite(LED_BLUE, waitingBlink ? LOW : HIGH);
+  digitalWrite(LED_GREEN, connected ? LOW : HIGH);
 }
 
 void postureOnConfig(const ConfigPacket& incoming) {
@@ -429,10 +416,6 @@ void applyCommand(const uint8_t* data, uint16_t len) {
   switch (data[0]) {
     case CMD_CALIBRATE:
       startCalibration();
-      break;
-    case CMD_TEST_VIBE:
-      testStartMs = millis();
-      testDurMs = 800;
       break;
     case CMD_SET_TIME:
       if (len >= 5) {
@@ -472,6 +455,10 @@ void postureOnCommand(const uint8_t* data, uint16_t len) {
   if (len < 1) {
     return;
   }
+  // Arm right away so the test buzz does not wait for the next sample tick.
+  if (data[0] == CMD_TEST_VIBE) {
+    armVibration(2000);
+  }
   if (len > sizeof(pendingBuf)) {
     len = sizeof(pendingBuf);
   }
@@ -508,6 +495,9 @@ void postureUpdate(uint32_t nowMs) {
   if (dt > 200) dt = 200;
 
   AccelSample sample = imuRead();
+  rawAx = sample.x;
+  rawAy = sample.y;
+  rawAz = sample.z;
   sensorFault = !sample.ok;
   float angle = 0;
   float motion = 0;
@@ -523,6 +513,13 @@ void postureUpdate(uint32_t nowMs) {
       gz += kFilterAlpha * (sample.z - gz);
     }
     motion = fabsf(sample.x - gx) + fabsf(sample.y - gy) + fabsf(sample.z - gz);
+    float mag = sqrtf(gx * gx + gy * gy + gz * gz);
+    if (mag > 0.5f && mag < 1.5f && !hasRef && !samplingCal) {
+      refX = gx;
+      refY = gy;
+      refZ = gz;
+      hasRef = true;
+    }
     if (samplingCal) {
       calX += gx;
       calY += gy;
@@ -532,18 +529,12 @@ void postureUpdate(uint32_t nowMs) {
         finishCalibration();
       }
     }
-    angle = hasRef ? tiltDeg() : 0;
+    angle = tiltDeg();
   }
 
   updateWear(motion, dt, nowMs);
   updateSlouch(angle, nowMs);
   trackMinute(dt, angle);
-
-  bool buzz = buzzingNow(nowMs);
-  setBuzz(buzz, cfg.strength);
-  if (testDurMs > 0 && (nowMs - testStartMs) >= testDurMs) {
-    testDurMs = 0;
-  }
 
   if ((nowMs - lastBatteryMs) > 10000UL || lastBatteryMs == 0) {
     lastBatteryMs = nowMs;
