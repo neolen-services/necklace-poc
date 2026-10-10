@@ -1,5 +1,5 @@
 name: necklace_poc
-description: "A new Flutter project."
+description: "Posture trainer for the Make My Health necklace."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -34,6 +34,15 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  flutter_blue_plus: ^2.3.14
+  flutter_riverpod: ^3.4.3
+  drift: ^2.35.2
+  drift_flutter: ^0.3.1
+  shared_preferences: ^2.5.6
+  permission_handler: ^13.0.2
+  flutter_foreground_task: ^11.0.3
+  flutter_local_notifications: ^22.3.1
+  google_fonts: ^9.0.0
 
 dev_dependencies:
   flutter_test:
@@ -45,6 +54,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  drift_dev: ^2.35.1
+  build_runner: ^2.16.2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
